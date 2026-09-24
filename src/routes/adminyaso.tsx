@@ -5,7 +5,7 @@ import { storeUser } from "@/lib/auth";
 import { ADMIN_ID } from "@/lib/store";
 import { verifyAdmin } from "@/lib/admin.functions";
 
-export const Route = createFileRoute("/adminop")({
+export const Route = createFileRoute("/adminyaso")({
   head: () => ({
     meta: [
       { title: "دخول الإدارة | Easy Money" },

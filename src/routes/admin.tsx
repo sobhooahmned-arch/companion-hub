@@ -5,7 +5,7 @@ import { getSubscriptions, type Subscription } from "@/lib/subscription";
 import { clearStoredUser, getStoredUser } from "@/lib/auth";
 import { fmt } from "@/lib/market";
 import { pushNotification } from "@/lib/notify";
-import { getPaySettings, savePaySettings, type PaySettings } from "@/lib/settings";
+import { DEFAULT_PAY_SETTINGS, getPaySettings, savePaySettings, type PaySettings } from "@/lib/settings";
 import { getThreads, sendAdminReply, type SupportThread } from "@/lib/support";
 import {
   deleteRequest,
