@@ -17,8 +17,8 @@ export function useNotifications(identifier: string | null) {
     if (!identifier) return;
     ensureDevicePermission();
 
-    const check = () => {
-      const fresh = takeUnseen(identifier);
+    const check = async () => {
+      const fresh = await takeUnseen(identifier).catch(() => []);
       if (fresh.length === 0) return;
       for (const n of fresh) showDeviceNotification(n.title, n.text);
       setToasts((prev) => [...prev, ...fresh]);
