@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 
 export type DepositMethod = {
   /** اسم طريقة التحويل الخاصة بالرقم، مثال: أورنج كاش / فودافون كاش */
@@ -88,7 +89,7 @@ export async function savePaySettings(value: PaySettings) {
   };
   const { error } = await supabase
     .from("pay_settings")
-    .upsert({ id: 1, data: clean as unknown as Record<string, unknown> }, { onConflict: "id" });
+    .upsert({ id: 1, data: clean as unknown as Json }, { onConflict: "id" });
   if (error) throw error;
   cache = clean;
 }
