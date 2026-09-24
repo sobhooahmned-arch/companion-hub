@@ -104,13 +104,13 @@ function RequestsPage() {
       return;
     }
     setUser(u);
-    setReqs(userRequests(u.identifier));
-    setSub(getSubscription(u.identifier));
+    const load = async () => {
+      setReqs(await userRequests(u.identifier).catch(() => []));
+      setSub(await getSubscription(u.identifier).catch(() => null));
+    };
+    void load();
 
-    const id = window.setInterval(() => {
-      setReqs(userRequests(u.identifier));
-      setSub(getSubscription(u.identifier));
-    }, 2000);
+    const id = window.setInterval(() => void load(), 3000);
     return () => window.clearInterval(id);
   }, [navigate]);
 

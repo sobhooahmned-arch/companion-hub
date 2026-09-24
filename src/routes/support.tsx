@@ -57,8 +57,9 @@ function SupportPage() {
       return;
     }
     setUser(u);
-    setMsgs(threadOf(u.identifier));
-    const id = window.setInterval(() => setMsgs(threadOf(u.identifier)), 2000);
+    const load = async () => setMsgs(await threadOf(u.identifier).catch(() => []));
+    void load();
+    const id = window.setInterval(() => void load(), 3000);
     return () => window.clearInterval(id);
   }, [navigate]);
 
@@ -72,9 +73,11 @@ function SupportPage() {
     e.preventDefault();
     const value = text.trim();
     if (!value || !user) return;
-    sendUserMessage({ identifier: user.identifier, name: user.name, text: value });
     setText("");
-    setMsgs(threadOf(user.identifier));
+    void (async () => {
+      await sendUserMessage({ identifier: user.identifier, name: user.name, text: value }).catch(() => undefined);
+      setMsgs(await threadOf(user.identifier).catch(() => []));
+    })();
   }
 
   return (
