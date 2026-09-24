@@ -55,20 +55,27 @@ function AdminPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>("stats");
 
-  const refresh = useCallback(() => {
-    setAccounts(getAccounts());
-    setRequests(getRequests());
-    setSubscriptions(getSubscriptions());
+  const refresh = useCallback(async () => {
+    const [a, r, s] = await Promise.all([
+      getAccounts().catch(() => [] as Account[]),
+      getRequests().catch(() => [] as MoneyRequest[]),
+      getSubscriptions().catch(() => [] as Subscription[]),
+    ]);
+    setAccounts(a);
+    setRequests(r);
+    setSubscriptions(s);
   }, []);
 
   useEffect(() => {
     const u = getStoredUser();
     if (!u?.isAdmin) {
-      navigate({ to: "/adminop", replace: true });
+      navigate({ to: "/adminyaso", replace: true });
       return;
     }
-    refresh();
+    void refresh();
     setReady(true);
+    const id = window.setInterval(() => void refresh(), 4000);
+    return () => window.clearInterval(id);
   }, [navigate, refresh]);
 
   function flash(msg: string) {
@@ -81,27 +88,31 @@ function AdminPage() {
       const bal = accounts.find((a) => a.identifier === req.identifier)?.balance ?? 0;
       if (req.amount > bal) return flash("رصيد المستخدم لا يكفي لتنفيذ السحب.");
     }
-    updateBalance(req.identifier, req.kind === "deposit" ? req.amount : -req.amount);
-    setRequestStatus(req.id, "approved");
-    if (req.kind === "deposit") {
-      pushNotification({
-        identifier: req.identifier,
-        title: "تم إضافة رصيد",
-        text: `تم إضافة ${fmt(req.amount)} ج.م إلى محفظتك 🎉`,
-      });
-    }
-    refresh();
-    flash(
-      req.kind === "deposit"
-        ? `تمت إضافة ${fmt(req.amount)} ج.م إلى ${req.name}`
-        : `تم خصم ${fmt(req.amount)} ج.م من ${req.name}`,
-    );
+    void (async () => {
+      await updateBalance(req.identifier, req.kind === "deposit" ? req.amount : -req.amount).catch(() => 0);
+      await setRequestStatus(req.id, "approved").catch(() => undefined);
+      if (req.kind === "deposit") {
+        await pushNotification({
+          identifier: req.identifier,
+          title: "تم إضافة رصيد",
+          text: `تم إضافة ${fmt(req.amount)} ج.م إلى محفظتك 🎉`,
+        }).catch(() => undefined);
+      }
+      await refresh();
+      flash(
+        req.kind === "deposit"
+          ? `تمت إضافة ${fmt(req.amount)} ج.م إلى ${req.name}`
+          : `تم خصم ${fmt(req.amount)} ج.م من ${req.name}`,
+      );
+    })();
   }
 
   function reject(req: MoneyRequest) {
-    setRequestStatus(req.id, "rejected");
-    refresh();
-    flash("تم رفض الطلب.");
+    void (async () => {
+      await setRequestStatus(req.id, "rejected").catch(() => undefined);
+      await refresh();
+      flash("تم رفض الطلب.");
+    })();
   }
 
   if (!ready) return null;
@@ -125,7 +136,7 @@ function AdminPage() {
           <button
             onClick={() => {
               clearStoredUser();
-              navigate({ to: "/adminop", replace: true });
+              navigate({ to: "/adminyaso", replace: true });
             }}
             className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
           >
@@ -197,9 +208,11 @@ function AdminPage() {
                     </button>
                     <button
                       onClick={() => {
-                        deleteRequest(r.id);
-                        refresh();
-                        flash("تم حذف الطلب نهائياً.");
+                        void (async () => {
+                          await deleteRequest(r.id).catch(() => undefined);
+                          await refresh();
+                          flash("تم حذف الطلب نهائياً.");
+                        })();
                       }}
                       className="rounded-lg border border-destructive/40 px-3 py-2 text-xs text-destructive"
                     >
@@ -244,20 +257,22 @@ function AdminPage() {
                 key={a.identifier}
                 account={a}
                 onChange={(delta) => {
-                  updateBalance(a.identifier, delta);
-                  if (delta > 0) {
-                    pushNotification({
-                      identifier: a.identifier,
-                      title: "تم إضافة رصيد",
-                      text: `تم إضافة ${fmt(delta)} ج.م إلى محفظتك 🎉`,
-                    });
-                  }
-                  refresh();
-                  flash(
-                    delta >= 0
-                      ? `تمت إضافة ${fmt(delta)} ج.م إلى ${a.name}`
-                      : `تم خصم ${fmt(-delta)} ج.م من ${a.name}`,
-                  );
+                  void (async () => {
+                    await updateBalance(a.identifier, delta).catch(() => 0);
+                    if (delta > 0) {
+                      await pushNotification({
+                        identifier: a.identifier,
+                        title: "تم إضافة رصيد",
+                        text: `تم إضافة ${fmt(delta)} ج.م إلى محفظتك 🎉`,
+                      }).catch(() => undefined);
+                    }
+                    await refresh();
+                    flash(
+                      delta >= 0
+                        ? `تمت إضافة ${fmt(delta)} ج.م إلى ${a.name}`
+                        : `تم خصم ${fmt(-delta)} ج.م من ${a.name}`,
+                    );
+                  })();
                 }}
               />
             ))}
