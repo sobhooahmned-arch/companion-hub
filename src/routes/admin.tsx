@@ -88,7 +88,7 @@ function AdminPage() {
       setReady(true);
     });
     const id = window.setInterval(() => {
-      void guard().then((ok) => ok && refresh());
+      void guard().then((ok) => { if (ok) void refresh(); });
     }, 4000);
     return () => window.clearInterval(id);
   }, [navigate, refresh]);
