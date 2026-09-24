@@ -61,9 +61,11 @@ function PackagesPage() {
       return;
     }
     setUser(u);
-    settleSubscription(u.identifier);
-    setBalance(getBalance(u.identifier));
-    setSub(getSubscription(u.identifier));
+    void (async () => {
+      await settleSubscription(u.identifier).catch(() => null);
+      setBalance(await getBalance(u.identifier).catch(() => 0));
+      setSub(await getSubscription(u.identifier).catch(() => null));
+    })();
   }, [navigate]);
 
   if (!user) return null;
@@ -85,20 +87,27 @@ function PackagesPage() {
     setLoading(true);
     const ms = randomLoadingMs();
     window.setTimeout(() => {
-      const created = subscribe({
-        identifier: user.identifier,
-        amount: pkg.amount,
-        returnAmount: pkg.returnAmount,
-        durationMs: pkg.durationMs,
-      });
-      const newBalance = updateBalance(user.identifier, -pkg.amount);
-      setBalance(newBalance);
-      setSub(created);
-      setNotice(
-        `تم خصم ${fmt(pkg.amount)} ج.م من محفظتك والاشتراك في الباقة، أرباحك هتزيد لحد ${fmt(pkg.returnAmount)} ج.م خلال ${pkg.duration}.`,
-      );
-      window.setTimeout(() => setNotice(null), 6000);
-      setLoading(false);
+      void (async () => {
+        try {
+          const created = await subscribe({
+            identifier: user.identifier,
+            amount: pkg.amount,
+            returnAmount: pkg.returnAmount,
+            durationMs: pkg.durationMs,
+          });
+          const newBalance = await updateBalance(user.identifier, -pkg.amount);
+          setBalance(newBalance);
+          setSub(created);
+          setNotice(
+            `تم خصم ${fmt(pkg.amount)} ج.م من محفظتك والاشتراك في الباقة، أرباحك هتزيد لحد ${fmt(pkg.returnAmount)} ج.م خلال ${pkg.duration}.`,
+          );
+          window.setTimeout(() => setNotice(null), 6000);
+        } catch {
+          setNotice("حدث خطأ أثناء الاشتراك، حاول مرة أخرى.");
+          window.setTimeout(() => setNotice(null), 5000);
+        }
+        setLoading(false);
+      })();
     }, ms);
   }
 
