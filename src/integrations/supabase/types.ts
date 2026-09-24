@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_devices: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          device_id: string
+          id: string
+          label: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          device_id: string
+          id?: string
+          label: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          device_id?: string
+          id?: string
+          label?: string
+          status?: string
+        }
+        Relationships: []
+      }
       money_requests: {
         Row: {
           amount: number

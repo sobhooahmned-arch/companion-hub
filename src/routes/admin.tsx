@@ -1,3 +1,4 @@
+import { myDeviceStatus } from "@/lib/devices";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { AdminStats } from "@/components/AdminStats";
@@ -72,9 +73,23 @@ function AdminPage() {
       navigate({ to: "/adminyaso", replace: true });
       return;
     }
-    void refresh();
-    setReady(true);
-    const id = window.setInterval(() => void refresh(), 4000);
+    const guard = async () => {
+      const s = await myDeviceStatus().catch(() => "approved" as const);
+      if (s !== "approved") {
+        clearStoredUser();
+        navigate({ to: "/adminyaso", replace: true });
+        return false;
+      }
+      return true;
+    };
+    void guard().then((ok) => {
+      if (!ok) return;
+      void refresh();
+      setReady(true);
+    });
+    const id = window.setInterval(() => {
+      void guard().then((ok) => { if (ok) void refresh(); });
+    }, 4000);
     return () => window.clearInterval(id);
   }, [navigate, refresh]);
 
