@@ -313,9 +313,11 @@ function AdminPage() {
                     </span>
                     <button
                       onClick={() => {
-                        deleteRequest(r.id);
-                        refresh();
-                        flash("تم حذف الطلب من السجل.");
+                        void (async () => {
+                          await deleteRequest(r.id).catch(() => undefined);
+                          await refresh();
+                          flash("تم حذف الطلب من السجل.");
+                        })();
                       }}
                       className="rounded-lg border border-destructive/40 px-2 py-1 text-xs text-destructive"
                     >
@@ -394,8 +396,9 @@ function SupportSection({ onReplied }: { onReplied: () => void }) {
   const [text, setText] = useState("");
 
   useEffect(() => {
-    setThreads(getThreads());
-    const id = window.setInterval(() => setThreads(getThreads()), 2000);
+    const load = async () => setThreads(await getThreads().catch(() => []));
+    void load();
+    const id = window.setInterval(() => void load(), 3000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -460,14 +463,16 @@ function SupportSection({ onReplied }: { onReplied: () => void }) {
                       onClick={() => {
                         const value = text.trim();
                         if (!value) return;
-                        sendAdminReply({
-                          identifier: active.identifier,
-                          name: active.name,
-                          text: value,
-                        });
                         setText("");
-                        setThreads(getThreads());
-                        onReplied();
+                        void (async () => {
+                          await sendAdminReply({
+                            identifier: active.identifier,
+                            name: active.name,
+                            text: value,
+                          }).catch(() => undefined);
+                          setThreads(await getThreads().catch(() => []));
+                          onReplied();
+                        })();
                       }}
                       className="rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground"
                     >
@@ -485,10 +490,10 @@ function SupportSection({ onReplied }: { onReplied: () => void }) {
 }
 
 function PaySettingsCard({ onSaved }: { onSaved: () => void }) {
-  const [form, setForm] = useState<PaySettings>(getPaySettings());
+  const [form, setForm] = useState<PaySettings>(DEFAULT_PAY_SETTINGS);
 
   useEffect(() => {
-    setForm(getPaySettings());
+    void getPaySettings().then(setForm);
   }, []);
 
   function setMethod(i: number, patch: Partial<{ name: string; number: string }>) {
@@ -567,9 +572,11 @@ function PaySettingsCard({ onSaved }: { onSaved: () => void }) {
 
       <button
         onClick={() => {
-          savePaySettings(form);
-          setForm(getPaySettings());
-          onSaved();
+          void (async () => {
+            await savePaySettings(form).catch(() => undefined);
+            setForm(await getPaySettings());
+            onSaved();
+          })();
         }}
         className="mt-4 w-full rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground"
       >
