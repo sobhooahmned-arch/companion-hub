@@ -152,6 +152,8 @@
 
   html {
     font-size: 15px;
+    touch-action: manipulation;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
@@ -176,6 +178,15 @@
   img {
     -webkit-user-drag: none;
     pointer-events: none;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role="button"] {
+    touch-action: manipulation;
   }
 }
 
