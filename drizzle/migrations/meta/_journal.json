@@ -8,6 +8,13 @@
       "when": 1790214059633,
       "tag": "0000_easy_money_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790215532163,
+      "tag": "0001_easy_money_tables",
+      "breakpoints": true
     }
   ]
 }

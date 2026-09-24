@@ -14,7 +14,195 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      accounts: {
+        Row: {
+          balance: number
+          created_at: string
+          id: string
+          identifier: string
+          method: string
+          name: string
+          password: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          id?: string
+          identifier: string
+          method?: string
+          name: string
+          password: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          id?: string
+          identifier?: string
+          method?: string
+          name?: string
+          password?: string
+        }
+        Relationships: []
+      }
+      money_requests: {
+        Row: {
+          amount: number
+          at: string
+          decided_at: string | null
+          from_number: string | null
+          id: string
+          identifier: string
+          kind: string
+          name: string
+          proof: string | null
+          proof_name: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          at?: string
+          decided_at?: string | null
+          from_number?: string | null
+          id?: string
+          identifier: string
+          kind: string
+          name: string
+          proof?: string | null
+          proof_name?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          at?: string
+          decided_at?: string | null
+          from_number?: string | null
+          id?: string
+          identifier?: string
+          kind?: string
+          name?: string
+          proof?: string | null
+          proof_name?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          at: string
+          id: string
+          identifier: string
+          seen: boolean
+          text: string
+          title: string
+        }
+        Insert: {
+          at?: string
+          id?: string
+          identifier: string
+          seen?: boolean
+          text: string
+          title: string
+        }
+        Update: {
+          at?: string
+          id?: string
+          identifier?: string
+          seen?: boolean
+          text?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      pay_settings: {
+        Row: {
+          data: Json
+          id: number
+        }
+        Insert: {
+          data: Json
+          id?: number
+        }
+        Update: {
+          data?: Json
+          id?: number
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          amount: number
+          credited: boolean
+          duration_ms: number
+          id: string
+          identifier: string
+          return_amount: number
+          started_at: number
+          tax: number
+          tax_paid: boolean
+          tax_proof_name: string | null
+          tax_sender_number: string | null
+          tax_submitted_at: string | null
+        }
+        Insert: {
+          amount: number
+          credited?: boolean
+          duration_ms: number
+          id?: string
+          identifier: string
+          return_amount: number
+          started_at: number
+          tax?: number
+          tax_paid?: boolean
+          tax_proof_name?: string | null
+          tax_sender_number?: string | null
+          tax_submitted_at?: string | null
+        }
+        Update: {
+          amount?: number
+          credited?: boolean
+          duration_ms?: number
+          id?: string
+          identifier?: string
+          return_amount?: number
+          started_at?: number
+          tax?: number
+          tax_paid?: boolean
+          tax_proof_name?: string | null
+          tax_sender_number?: string | null
+          tax_submitted_at?: string | null
+        }
+        Relationships: []
+      }
+      support_messages: {
+        Row: {
+          at: string
+          id: string
+          identifier: string
+          image: string | null
+          name: string
+          sender: string
+          text: string
+        }
+        Insert: {
+          at?: string
+          id?: string
+          identifier: string
+          image?: string | null
+          name: string
+          sender: string
+          text: string
+        }
+        Update: {
+          at?: string
+          id?: string
+          identifier?: string
+          image?: string | null
+          name?: string
+          sender?: string
+          text?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
