@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export const ADMIN_ID = "admin";
 
 export type Account = {
@@ -23,72 +25,129 @@ export type MoneyRequest = {
   fromNumber?: string;
 };
 
-const ACCOUNTS_KEY = "em_accounts";
-const REQUESTS_KEY = "em_requests";
-
-function read<T>(key: string): T[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function write<T>(key: string, value: T[]) {
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
 export function norm(v: string) {
   return v.trim().toLowerCase();
 }
 
-export function getAccounts(): Account[] {
-  return read<Account>(ACCOUNTS_KEY);
+type AccountRow = {
+  identifier: string;
+  method: string;
+  name: string;
+  password: string;
+  balance: number;
+  created_at: string;
+};
+
+type RequestRow = {
+  id: string;
+  identifier: string;
+  name: string;
+  kind: string;
+  amount: number;
+  status: string;
+  at: string;
+  decided_at: string | null;
+  proof: string | null;
+  proof_name: string | null;
+  from_number: string | null;
+};
+
+function mapAccount(r: AccountRow): Account {
+  return {
+    identifier: r.identifier,
+    method: r.method === "phone" ? "phone" : "email",
+    name: r.name,
+    password: r.password,
+    balance: r.balance,
+    createdAt: r.created_at,
+  };
 }
 
-export function findAccount(identifier: string): Account | null {
-  const id = norm(identifier);
-  return getAccounts().find((a) => norm(a.identifier) === id) ?? null;
+function mapRequest(r: RequestRow): MoneyRequest {
+  const req: MoneyRequest = {
+    id: r.id,
+    identifier: r.identifier,
+    name: r.name,
+    kind: r.kind === "withdraw" ? "withdraw" : "deposit",
+    amount: r.amount,
+    status: (r.status as MoneyRequest["status"]) ?? "pending",
+    at: r.at,
+  };
+  if (r.decided_at) req.decidedAt = r.decided_at;
+  if (r.proof) req.proof = r.proof;
+  if (r.proof_name) req.proofName = r.proof_name;
+  if (r.from_number) req.fromNumber = r.from_number;
+  return req;
 }
 
-export function createAccount(input: {
+export async function getAccounts(): Promise<Account[]> {
+  const { data, error } = await supabase
+    .from("accounts")
+    .select("identifier, method, name, password, balance, created_at")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(mapAccount);
+}
+
+export async function findAccount(identifier: string): Promise<Account | null> {
+  const { data, error } = await supabase
+    .from("accounts")
+    .select("identifier, method, name, password, balance, created_at")
+    .ilike("identifier", identifier.trim())
+    .limit(1);
+  if (error) throw error;
+  const row = data?.[0];
+  return row ? mapAccount(row) : null;
+}
+
+export async function createAccount(input: {
   identifier: string;
   method: "email" | "phone";
   name: string;
   password: string;
-}): Account {
-  const account: Account = {
-    identifier: input.identifier.trim(),
-    method: input.method,
-    name: input.name.trim(),
-    password: input.password,
-    balance: 0,
-    createdAt: new Date().toISOString(),
-  };
-  write(ACCOUNTS_KEY, [...getAccounts(), account]);
-  return account;
+}): Promise<Account> {
+  const { data, error } = await supabase
+    .from("accounts")
+    .insert({
+      identifier: input.identifier.trim(),
+      method: input.method,
+      name: input.name.trim(),
+      password: input.password,
+      balance: 0,
+    })
+    .select("identifier, method, name, password, balance, created_at")
+    .single();
+  if (error) throw error;
+  return mapAccount(data);
 }
 
-export function updateBalance(identifier: string, delta: number): number {
-  const id = norm(identifier);
-  const accounts = getAccounts().map((a) =>
-    norm(a.identifier) === id ? { ...a, balance: Math.max(0, a.balance + delta) } : a,
-  );
-  write(ACCOUNTS_KEY, accounts);
-  return accounts.find((a) => norm(a.identifier) === id)?.balance ?? 0;
+export async function updateBalance(identifier: string, delta: number): Promise<number> {
+  const account = await findAccount(identifier);
+  if (!account) return 0;
+  const next = Math.max(0, account.balance + delta);
+  const { error } = await supabase
+    .from("accounts")
+    .update({ balance: next })
+    .ilike("identifier", identifier.trim());
+  if (error) throw error;
+  return next;
 }
 
-export function getBalance(identifier: string): number {
-  return findAccount(identifier)?.balance ?? 0;
+export async function getBalance(identifier: string): Promise<number> {
+  const account = await findAccount(identifier);
+  return account?.balance ?? 0;
 }
 
-export function getRequests(): MoneyRequest[] {
-  return read<MoneyRequest>(REQUESTS_KEY);
+export async function getRequests(): Promise<MoneyRequest[]> {
+  const { data, error } = await supabase
+    .from("money_requests")
+    .select("*")
+    .order("at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapRequest);
 }
 
-export function addRequest(input: {
+export async function addRequest(input: {
   identifier: string;
   name: string;
   kind: "deposit" | "withdraw";
@@ -96,62 +155,63 @@ export function addRequest(input: {
   proof?: string;
   proofName?: string;
   fromNumber?: string;
-}): MoneyRequest {
-  const req: MoneyRequest = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    identifier: input.identifier,
-    name: input.name,
-    kind: input.kind,
-    amount: input.amount,
-    status: "pending",
-    at: new Date().toISOString(),
-  };
-  if (input.proof !== undefined) {
-    req.proof = input.proof;
-    if (input.proofName !== undefined) req.proofName = input.proofName;
-  }
-  if (input.fromNumber !== undefined) req.fromNumber = input.fromNumber;
-  write(REQUESTS_KEY, [req, ...getRequests()]);
-  return req;
+}): Promise<MoneyRequest> {
+  const { data, error } = await supabase
+    .from("money_requests")
+    .insert({
+      identifier: input.identifier,
+      name: input.name,
+      kind: input.kind,
+      amount: input.amount,
+      status: "pending",
+      proof: input.proof ?? null,
+      proof_name: input.proofName ?? null,
+      from_number: input.fromNumber ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return mapRequest(data);
 }
 
-export function setRequestStatus(id: string, status: "approved" | "rejected") {
-  write(
-    REQUESTS_KEY,
-    getRequests().map((r) =>
-      r.id === id ? { ...r, status, decidedAt: new Date().toISOString() } : r,
-    ),
-  );
+export async function setRequestStatus(id: string, status: "approved" | "rejected") {
+  const { error } = await supabase
+    .from("money_requests")
+    .update({ status, decided_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
 }
 
-export function deleteRequest(id: string) {
-  write(
-    REQUESTS_KEY,
-    getRequests().filter((r) => r.id !== id),
-  );
+export async function deleteRequest(id: string) {
+  const { error } = await supabase.from("money_requests").delete().eq("id", id);
+  if (error) throw error;
 }
 
 export const DEPOSIT_BAN_MS = 15 * 60 * 1000;
 
+export async function userRequests(identifier: string): Promise<MoneyRequest[]> {
+  const { data, error } = await supabase
+    .from("money_requests")
+    .select("*")
+    .ilike("identifier", identifier.trim())
+    .order("at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(mapRequest);
+}
+
 /** طلب إيداع قيد المراجعة للمستخدم (إن وجد) */
-export function pendingDeposit(identifier: string): MoneyRequest | null {
-  return (
-    userRequests(identifier).find((r) => r.kind === "deposit" && r.status === "pending") ??
-    null
-  );
+export async function pendingDeposit(identifier: string): Promise<MoneyRequest | null> {
+  const reqs = await userRequests(identifier);
+  return reqs.find((r) => r.kind === "deposit" && r.status === "pending") ?? null;
 }
 
 /** وقت انتهاء حظر الإيداع (timestamp) بعد رفض آخر طلب، أو null */
-export function depositBanUntil(identifier: string): number | null {
-  const lastRejected = userRequests(identifier)
+export async function depositBanUntil(identifier: string): Promise<number | null> {
+  const reqs = await userRequests(identifier);
+  const lastRejected = reqs
     .filter((r) => r.kind === "deposit" && r.status === "rejected" && r.decidedAt)
     .sort((a, b) => (b.decidedAt ?? "").localeCompare(a.decidedAt ?? ""))[0];
   if (!lastRejected?.decidedAt) return null;
   const until = new Date(lastRejected.decidedAt).getTime() + DEPOSIT_BAN_MS;
   return until > Date.now() ? until : null;
-}
-
-export function userRequests(identifier: string): MoneyRequest[] {
-  const id = norm(identifier);
-  return getRequests().filter((r) => norm(r.identifier) === id);
 }

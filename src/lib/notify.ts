@@ -1,4 +1,4 @@
-import { norm } from "@/lib/store";
+import { supabase } from "@/integrations/supabase/client";
 
 export type AppNotification = {
   id: string;
@@ -9,48 +9,46 @@ export type AppNotification = {
   seen: boolean;
 };
 
-const KEY = "em_notifications";
+type Row = {
+  id: string;
+  identifier: string;
+  title: string;
+  text: string;
+  at: string;
+  seen: boolean;
+};
 
-function read(): AppNotification[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as AppNotification[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function write(list: AppNotification[]) {
-  window.localStorage.setItem(KEY, JSON.stringify(list));
+function map(r: Row): AppNotification {
+  return { id: r.id, identifier: r.identifier, title: r.title, text: r.text, at: r.at, seen: r.seen };
 }
 
 /** إضافة إشعار لمستخدم معيّن */
-export function pushNotification(input: {
+export async function pushNotification(input: {
   identifier: string;
   title: string;
   text: string;
 }) {
-  if (typeof window === "undefined") return;
-  const item: AppNotification = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+  const { error } = await supabase.from("notifications").insert({
     identifier: input.identifier,
     title: input.title,
     text: input.text,
-    at: new Date().toISOString(),
     seen: false,
-  };
-  write([...read(), item].slice(-60));
+  });
+  if (error) throw error;
 }
 
 /** الإشعارات الجديدة للمستخدم، ويتم تعليمها كمقروءة */
-export function takeUnseen(identifier: string): AppNotification[] {
-  const id = norm(identifier);
-  const all = read();
-  const unseen = all.filter((n) => !n.seen && norm(n.identifier) === id);
-  if (unseen.length === 0) return [];
-  write(all.map((n) => (unseen.some((u) => u.id === n.id) ? { ...n, seen: true } : n)));
-  return unseen;
+export async function takeUnseen(identifier: string): Promise<AppNotification[]> {
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .ilike("identifier", identifier.trim())
+    .eq("seen", false)
+    .order("at", { ascending: true });
+  if (error || !data || data.length === 0) return [];
+  const ids = data.map((n) => n.id);
+  await supabase.from("notifications").update({ seen: true }).in("id", ids);
+  return data.map(map);
 }
 
 /** طلب إذن إشعارات الهاتف */
