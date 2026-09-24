@@ -11,7 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AdminopRouteImport } from './routes/adminop'
+import { Route as AdminyasoRouteImport } from './routes/adminyaso'
 import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as RequestsRouteImport } from './routes/requests'
@@ -29,9 +29,9 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminopRoute = AdminopRouteImport.update({
-  id: '/adminop',
-  path: '/adminop',
+const AdminyasoRoute = AdminyasoRouteImport.update({
+  id: '/adminyaso',
+  path: '/adminyaso',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DepositRoute = DepositRouteImport.update({
@@ -68,7 +68,7 @@ const PackagesGroupRoute = PackagesGroupRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/adminop': typeof AdminopRoute
+  '/adminyaso': typeof AdminyasoRoute
   '/deposit': typeof DepositRoute
   '/market': typeof MarketRoute
   '/requests': typeof RequestsRoute
@@ -79,7 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/adminop': typeof AdminopRoute
+  '/adminyaso': typeof AdminyasoRoute
   '/deposit': typeof DepositRoute
   '/market': typeof MarketRoute
   '/requests': typeof RequestsRoute
@@ -91,7 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/adminop': typeof AdminopRoute
+  '/adminyaso': typeof AdminyasoRoute
   '/deposit': typeof DepositRoute
   '/market': typeof MarketRoute
   '/requests': typeof RequestsRoute
@@ -104,7 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/adminop'
+    | '/adminyaso'
     | '/deposit'
     | '/market'
     | '/requests'
@@ -115,7 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
-    | '/adminop'
+    | '/adminyaso'
     | '/deposit'
     | '/market'
     | '/requests'
@@ -126,7 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
-    | '/adminop'
+    | '/adminyaso'
     | '/deposit'
     | '/market'
     | '/requests'
@@ -138,7 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  AdminopRoute: typeof AdminopRoute
+  AdminyasoRoute: typeof AdminyasoRoute
   DepositRoute: typeof DepositRoute
   MarketRoute: typeof MarketRoute
   RequestsRoute: typeof RequestsRoute
@@ -163,11 +163,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/adminop': {
-      id: '/adminop'
-      path: '/adminop'
-      fullPath: '/adminop'
-      preLoaderRoute: typeof AdminopRouteImport
+    '/adminyaso': {
+      id: '/adminyaso'
+      path: '/adminyaso'
+      fullPath: '/adminyaso'
+      preLoaderRoute: typeof AdminyasoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deposit': {
@@ -218,7 +218,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  AdminopRoute: AdminopRoute,
+  AdminyasoRoute: AdminyasoRoute,
   DepositRoute: DepositRoute,
   MarketRoute: MarketRoute,
   RequestsRoute: RequestsRoute,

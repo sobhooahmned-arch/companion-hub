@@ -15,6 +15,13 @@
       "when": 1790215532163,
       "tag": "0001_easy_money_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790215720685,
+      "tag": "0002_lov_database_migration",
+      "breakpoints": true
     }
   ]
 }

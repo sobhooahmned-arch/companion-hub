@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { pushNotification } from "@/lib/notify";
 import { norm } from "@/lib/store";
 
@@ -12,32 +13,49 @@ export type SupportMessage = {
   at: string;
 };
 
-const KEY = "em_support";
-
 export const AUTO_REPLY =
   "يرجى الانتظار، تم الاطلاع على مشكلتك وسوف يتم التواصل معك في أسرع وقت.";
 
-function read(): SupportMessage[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as SupportMessage[]) : [];
-  } catch {
-    return [];
-  }
+type Row = {
+  id: string;
+  identifier: string;
+  name: string;
+  sender: string;
+  text: string;
+  image: string | null;
+  at: string;
+};
+
+function map(r: Row): SupportMessage {
+  const msg: SupportMessage = {
+    id: r.id,
+    identifier: r.identifier,
+    name: r.name,
+    from: (r.sender as SupportMessage["from"]) ?? "user",
+    text: r.text,
+    at: r.at,
+  };
+  if (r.image) msg.image = r.image;
+  return msg;
 }
 
-function write(list: SupportMessage[]) {
-  window.localStorage.setItem(KEY, JSON.stringify(list));
+export async function getAllMessages(): Promise<SupportMessage[]> {
+  const { data, error } = await supabase
+    .from("support_messages")
+    .select("*")
+    .order("at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(map);
 }
 
-export function getAllMessages(): SupportMessage[] {
-  return read().sort((a, b) => a.at.localeCompare(b.at));
-}
-
-export function threadOf(identifier: string): SupportMessage[] {
-  const id = norm(identifier);
-  return getAllMessages().filter((m) => norm(m.identifier) === id);
+export async function threadOf(identifier: string): Promise<SupportMessage[]> {
+  const { data, error } = await supabase
+    .from("support_messages")
+    .select("*")
+    .ilike("identifier", identifier.trim())
+    .order("at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(map);
 }
 
 export type SupportThread = {
@@ -48,13 +66,14 @@ export type SupportThread = {
   waiting: boolean;
 };
 
-export function getThreads(): SupportThread[] {
-  const map = new Map<string, SupportMessage[]>();
-  for (const m of getAllMessages()) {
+export async function getThreads(): Promise<SupportThread[]> {
+  const all = await getAllMessages();
+  const mapByUser = new Map<string, SupportMessage[]>();
+  for (const m of all) {
     const key = norm(m.identifier);
-    map.set(key, [...(map.get(key) ?? []), m]);
+    mapByUser.set(key, [...(mapByUser.get(key) ?? []), m]);
   }
-  return [...map.values()]
+  return [...mapByUser.values()]
     .map((messages) => {
       const last = messages[messages.length - 1]!;
       const lastUser = [...messages].reverse().find((m) => m.from === "user");
@@ -70,24 +89,25 @@ export function getThreads(): SupportThread[] {
     .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
 }
 
-function push(msg: Omit<SupportMessage, "id" | "at">): SupportMessage {
-  const full: SupportMessage = {
-    ...msg,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    at: new Date().toISOString(),
-  };
-  write([...read(), full]);
-  return full;
+async function push(msg: Omit<SupportMessage, "id" | "at">) {
+  const { error } = await supabase.from("support_messages").insert({
+    identifier: msg.identifier,
+    name: msg.name,
+    sender: msg.from,
+    text: msg.text,
+    image: msg.image ?? null,
+  });
+  if (error) throw error;
 }
 
 /** رسالة من المستخدم + رد تلقائي فوري */
-export function sendUserMessage(input: {
+export async function sendUserMessage(input: {
   identifier: string;
   name: string;
   text: string;
 }) {
-  push({ ...input, from: "user" });
-  push({
+  await push({ ...input, from: "user" });
+  await push({
     identifier: input.identifier,
     name: input.name,
     from: "system",
@@ -95,13 +115,13 @@ export function sendUserMessage(input: {
   });
 }
 
-export function sendAdminReply(input: {
+export async function sendAdminReply(input: {
   identifier: string;
   name: string;
   text: string;
 }) {
-  push({ ...input, from: "admin" });
-  pushNotification({
+  await push({ ...input, from: "admin" });
+  await pushNotification({
     identifier: input.identifier,
     title: "رد الدعم الفني",
     text: `تم الرد على طلبك من الدعم الفني: ${input.text}`,

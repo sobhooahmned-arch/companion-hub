@@ -1,3 +1,6 @@
+import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
+
 export type DepositMethod = {
   /** اسم طريقة التحويل الخاصة بالرقم، مثال: أورنج كاش / فودافون كاش */
   name: string;
@@ -14,8 +17,6 @@ export type PaySettings = {
   taxNumber: string;
 };
 
-const KEY = "em_pay_settings";
-
 export const DEFAULT_PAY_SETTINGS: PaySettings = {
   methodName: "أورنج كاش",
   depositMethods: [
@@ -29,7 +30,6 @@ function sanitizeMethods(raw: unknown, fallbackName: string): DepositMethod[] {
   if (!Array.isArray(raw)) return [];
   const out: DepositMethod[] = [];
   for (const item of raw) {
-    // توافق مع التنسيق القديم: مصفوفة أرقام نصية
     if (typeof item === "string") {
       if (item.trim()) out.push({ name: fallbackName, number: item.trim() });
       continue;
@@ -45,44 +45,51 @@ function sanitizeMethods(raw: unknown, fallbackName: string): DepositMethod[] {
   return out;
 }
 
-export function getPaySettings(): PaySettings {
-  if (typeof window === "undefined") return DEFAULT_PAY_SETTINGS;
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return DEFAULT_PAY_SETTINGS;
-    const parsed = JSON.parse(raw) as Partial<PaySettings> & {
-      depositNumbers?: unknown;
-    };
-    const methodName = parsed.methodName?.trim() || DEFAULT_PAY_SETTINGS.methodName;
-    const methods = sanitizeMethods(
-      parsed.depositMethods ?? parsed.depositNumbers,
-      methodName,
-    );
-    return {
-      methodName,
-      depositMethods: methods.length ? methods : DEFAULT_PAY_SETTINGS.depositMethods,
-      taxNumber: parsed.taxNumber?.trim() || DEFAULT_PAY_SETTINGS.taxNumber,
-    };
-  } catch {
-    return DEFAULT_PAY_SETTINGS;
-  }
+function normalize(parsed: Partial<PaySettings> & { depositNumbers?: unknown }): PaySettings {
+  const methodName = parsed.methodName?.trim() || DEFAULT_PAY_SETTINGS.methodName;
+  const methods = sanitizeMethods(parsed.depositMethods ?? parsed.depositNumbers, methodName);
+  return {
+    methodName,
+    depositMethods: methods.length ? methods : DEFAULT_PAY_SETTINGS.depositMethods,
+    taxNumber: parsed.taxNumber?.trim() || DEFAULT_PAY_SETTINGS.taxNumber,
+  };
 }
 
-export function savePaySettings(value: PaySettings) {
-  if (typeof window === "undefined") return;
+let cache: PaySettings | null = null;
+
+export async function getPaySettings(): Promise<PaySettings> {
+  try {
+    const { data, error } = await supabase
+      .from("pay_settings")
+      .select("data")
+      .eq("id", 1)
+      .maybeSingle();
+    if (error) throw error;
+    cache = data?.data ? normalize(data.data as Partial<PaySettings>) : DEFAULT_PAY_SETTINGS;
+  } catch {
+    cache = cache ?? DEFAULT_PAY_SETTINGS;
+  }
+  return cache;
+}
+
+/** قراءة محلية سريعة من آخر قيمة محمّلة */
+export function getCachedPaySettings(): PaySettings {
+  return cache ?? DEFAULT_PAY_SETTINGS;
+}
+
+export async function savePaySettings(value: PaySettings) {
   const methodName = value.methodName.trim() || DEFAULT_PAY_SETTINGS.methodName;
   const depositMethods = value.depositMethods
-    .map((m) => ({
-      name: m.name.trim() || methodName,
-      number: m.number.trim(),
-    }))
+    .map((m) => ({ name: m.name.trim() || methodName, number: m.number.trim() }))
     .filter((m) => m.number.length > 0);
-  window.localStorage.setItem(
-    KEY,
-    JSON.stringify({
-      methodName,
-      depositMethods,
-      taxNumber: value.taxNumber.trim() || DEFAULT_PAY_SETTINGS.taxNumber,
-    }),
-  );
+  const clean: PaySettings = {
+    methodName,
+    depositMethods,
+    taxNumber: value.taxNumber.trim() || DEFAULT_PAY_SETTINGS.taxNumber,
+  };
+  const { error } = await supabase
+    .from("pay_settings")
+    .upsert({ id: 1, data: clean as unknown as Json }, { onConflict: "id" });
+  if (error) throw error;
+  cache = clean;
 }

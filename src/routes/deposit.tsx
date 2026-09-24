@@ -13,7 +13,7 @@ import {
   type MoneyRequest,
 } from "@/lib/store";
 
-import { getPaySettings } from "@/lib/settings";
+import { DEFAULT_PAY_SETTINGS, getPaySettings } from "@/lib/settings";
 
 export const Route = createFileRoute("/deposit")({
   ssr: false,
@@ -73,11 +73,11 @@ function DepositPage() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"form" | "pending" | "banned">("form");
   const [banLeft, setBanLeft] = useState(0);
-  const [settings, setSettings] = useState(getPaySettings());
+  const [settings, setSettings] = useState(DEFAULT_PAY_SETTINGS);
   const [loading, setLoading] = useState(false);
   const METHODS = settings.depositMethods;
   useEffect(() => {
-    setSettings(getPaySettings());
+    void getPaySettings().then(setSettings);
   }, []);
 
   useEffect(() => {
@@ -91,17 +91,19 @@ function DepositPage() {
       return;
     }
     setUser(u);
-    setBalance(getBalance(u.identifier));
-    setReqs(userRequests(u.identifier));
-    if (pendingDeposit(u.identifier)) {
-      setView("pending");
-      return;
-    }
-    const until = depositBanUntil(u.identifier);
-    if (until) {
-      setBanLeft(until - Date.now());
-      setView("banned");
-    }
+    void (async () => {
+      setBalance(await getBalance(u.identifier).catch(() => 0));
+      setReqs(await userRequests(u.identifier).catch(() => []));
+      if (await pendingDeposit(u.identifier).catch(() => null)) {
+        setView("pending");
+        return;
+      }
+      const until = await depositBanUntil(u.identifier).catch(() => null);
+      if (until) {
+        setBanLeft(until - Date.now());
+        setView("banned");
+      }
+    })();
   }, [navigate]);
 
   useEffect(() => {
@@ -155,32 +157,42 @@ function DepositPage() {
     if (value > 1_000_000) return setError("المبلغ أكبر من الحد المسموح.");
     if (!proof) return setError("أرفق صورة التحويل أولاً.");
     if (!/^\d{11}$/.test(fromNumber)) return setError("اكتب الرقم الذي تم التحويل منه (11 رقم).");
-    if (pendingDeposit(activeUser.identifier)) {
-      setView("pending");
-      return;
-    }
-    const until = depositBanUntil(activeUser.identifier);
-    if (until) {
-      setBanLeft(until - Date.now());
-      setView("banned");
-      return;
-    }
     setLoading(true);
-    const ms = randomLoadingMs();
-    window.setTimeout(() => {
-      addRequest({
-        identifier: activeUser.identifier,
-        name: activeUser.name,
-        kind: "deposit",
-        amount: value,
-        proof: proof.dataUrl,
-        proofName: proof.name,
-        fromNumber,
-      });
-      setReqs(userRequests(activeUser.identifier));
-      setView("pending");
-      setLoading(false);
-    }, ms);
+    void (async () => {
+      if (await pendingDeposit(activeUser.identifier).catch(() => null)) {
+        setLoading(false);
+        setView("pending");
+        return;
+      }
+      const until = await depositBanUntil(activeUser.identifier).catch(() => null);
+      if (until) {
+        setLoading(false);
+        setBanLeft(until - Date.now());
+        setView("banned");
+        return;
+      }
+      const ms = randomLoadingMs();
+      window.setTimeout(() => {
+        void (async () => {
+          try {
+            await addRequest({
+              identifier: activeUser.identifier,
+              name: activeUser.name,
+              kind: "deposit",
+              amount: value,
+              proof: proof.dataUrl,
+              proofName: proof.name,
+              fromNumber,
+            });
+            setReqs(await userRequests(activeUser.identifier).catch(() => []));
+            setView("pending");
+          } catch {
+            setError("حدث خطأ أثناء إرسال الطلب، حاول مرة أخرى.");
+          }
+          setLoading(false);
+        })();
+      }, ms);
+    })();
   }
 
   return (

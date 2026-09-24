@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { updateBalance } from "@/lib/store";
 
 export type Subscription = {
@@ -14,8 +15,6 @@ export type Subscription = {
   credited?: boolean;
 };
 
-const KEY = "em_subscriptions";
-
 /** رقم استلام الضريبة */
 export const TAX_PHONE = "01208895415";
 
@@ -30,18 +29,35 @@ export const PACKAGE_TAX: Record<number, number> = {
   20000: 22000,
 };
 
-function read(): Subscription[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Subscription[]) : [];
-  } catch {
-    return [];
-  }
-}
+type Row = {
+  identifier: string;
+  amount: number;
+  return_amount: number;
+  duration_ms: number;
+  started_at: number;
+  tax: number;
+  tax_paid: boolean;
+  tax_sender_number: string | null;
+  tax_proof_name: string | null;
+  tax_submitted_at: string | null;
+  credited: boolean;
+};
 
-function write(list: Subscription[]) {
-  window.localStorage.setItem(KEY, JSON.stringify(list));
+function map(r: Row): Subscription {
+  const sub: Subscription = {
+    identifier: r.identifier,
+    amount: r.amount,
+    returnAmount: r.return_amount,
+    durationMs: Number(r.duration_ms),
+    startedAt: Number(r.started_at),
+    tax: r.tax,
+    taxPaid: r.tax_paid,
+    credited: r.credited,
+  };
+  if (r.tax_sender_number) sub.taxSenderNumber = r.tax_sender_number;
+  if (r.tax_proof_name) sub.taxProofName = r.tax_proof_name;
+  if (r.tax_submitted_at) sub.taxSubmittedAt = r.tax_submitted_at;
+  return sub;
 }
 
 function norm(v: string) {
@@ -49,52 +65,68 @@ function norm(v: string) {
 }
 
 /** كل الاشتراكات المسجلة (للوحة الإدارة) */
-export function getSubscriptions(): Subscription[] {
-  return read();
+export async function getSubscriptions(): Promise<Subscription[]> {
+  const { data, error } = await supabase.from("subscriptions").select("*");
+  if (error) throw error;
+  return (data ?? []).map(map);
 }
 
-export function getSubscription(identifier: string): Subscription | null {
-  const id = norm(identifier);
-  return read().find((s) => norm(s.identifier) === id) ?? null;
+export async function getSubscription(identifier: string): Promise<Subscription | null> {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("*")
+    .ilike("identifier", identifier.trim())
+    .limit(1);
+  if (error) throw error;
+  const row = data?.[0];
+  return row ? map(row) : null;
 }
 
-export function subscribe(input: {
+export async function subscribe(input: {
   identifier: string;
   amount: number;
   returnAmount: number;
   durationMs: number;
-}): Subscription {
-  const sub: Subscription = {
-    identifier: input.identifier,
-    amount: input.amount,
-    returnAmount: input.returnAmount,
-    durationMs: input.durationMs,
-    startedAt: Date.now(),
-    tax: PACKAGE_TAX[input.amount] ?? 0,
-  };
-  write([sub, ...read().filter((s) => norm(s.identifier) !== norm(input.identifier))]);
-  return sub;
+}): Promise<Subscription> {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .upsert(
+      {
+        identifier: input.identifier,
+        amount: input.amount,
+        return_amount: input.returnAmount,
+        duration_ms: Math.round(input.durationMs),
+        started_at: Date.now(),
+        tax: PACKAGE_TAX[input.amount] ?? 0,
+        tax_paid: false,
+        tax_sender_number: null,
+        tax_proof_name: null,
+        tax_submitted_at: null,
+        credited: false,
+      },
+      { onConflict: "identifier" },
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return map(data);
 }
 
-export function submitTaxProof(input: {
+export async function submitTaxProof(input: {
   identifier: string;
   senderNumber: string;
   proofName: string;
 }) {
-  const id = norm(input.identifier);
-  write(
-    read().map((s) =>
-      norm(s.identifier) === id
-        ? {
-            ...s,
-            taxPaid: true,
-            taxSenderNumber: input.senderNumber,
-            taxProofName: input.proofName,
-            taxSubmittedAt: new Date().toISOString(),
-          }
-        : s,
-    ),
-  );
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({
+      tax_paid: true,
+      tax_sender_number: input.senderNumber,
+      tax_proof_name: input.proofName,
+      tax_submitted_at: new Date().toISOString(),
+    })
+    .ilike("identifier", input.identifier.trim());
+  if (error) throw error;
 }
 
 /** نسبة اكتمال الباقة من 0 إلى 1 */
@@ -117,14 +149,15 @@ export function remainingMs(sub: Subscription, now = Date.now()): number {
  * تحويل أرباح الباقة للمحفظة تلقائياً بعد انتهاء مدتها (مرة واحدة فقط).
  * يرجع المبلغ المضاف أو null لو لم يحن الوقت أو تمت الإضافة سابقاً.
  */
-export function settleSubscription(identifier: string): number | null {
-  const sub = getSubscription(identifier);
+export async function settleSubscription(identifier: string): Promise<number | null> {
+  const sub = await getSubscription(identifier);
   if (!sub || sub.credited || progressOf(sub) < 1) return null;
-  const id = norm(identifier);
-  write(
-    read().map((s) => (norm(s.identifier) === id ? { ...s, credited: true } : s)),
-  );
-  updateBalance(identifier, sub.returnAmount);
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ credited: true })
+    .ilike("identifier", identifier.trim());
+  if (error) throw error;
+  await updateBalance(identifier, sub.returnAmount);
   return sub.returnAmount;
 }
 

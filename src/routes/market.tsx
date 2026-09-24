@@ -67,9 +67,11 @@ function MarketPage() {
       return;
     }
     setUser(u);
-    settleSubscription(u.identifier);
-    setBalance(getBalance(u.identifier));
-    setSub(getSubscription(u.identifier));
+    void (async () => {
+      await settleSubscription(u.identifier).catch(() => null);
+      setBalance(await getBalance(u.identifier).catch(() => 0));
+      setSub(await getSubscription(u.identifier).catch(() => null));
+    })();
   }, [navigate]);
 
   useEffect(() => {
@@ -86,13 +88,16 @@ function MarketPage() {
   useEffect(() => {
     if (!user) return;
     const id = window.setInterval(() => {
-      const credited = settleSubscription(user.identifier);
-      if (credited) {
-        setNotice(`تم إضافة أرباحك ${fmt(credited)} ج.م لرصيد محفظتك تلقائياً 🎉`);
-        window.setTimeout(() => setNotice(null), 8000);
-      }
-      setBalance(getBalance(user.identifier));
-    }, 2000);
+      void (async () => {
+        const credited = await settleSubscription(user.identifier).catch(() => null);
+        if (credited) {
+          setNotice(`تم إضافة أرباحك ${fmt(credited)} ج.م لرصيد محفظتك تلقائياً 🎉`);
+          window.setTimeout(() => setNotice(null), 8000);
+          setSub(await getSubscription(user.identifier).catch(() => null));
+        }
+        setBalance(await getBalance(user.identifier).catch(() => 0));
+      })();
+    }, 3000);
     return () => window.clearInterval(id);
   }, [user]);
 

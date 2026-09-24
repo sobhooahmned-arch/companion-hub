@@ -15,7 +15,7 @@ import {
   submitTaxProof,
   type Subscription,
 } from "@/lib/subscription";
-import { getPaySettings } from "@/lib/settings";
+import { DEFAULT_PAY_SETTINGS, getPaySettings } from "@/lib/settings";
 
 export const Route = createFileRoute("/withdraw")({
   ssr: false,
@@ -56,8 +56,12 @@ function WithdrawPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const paySettings = getPaySettings();
+  const [paySettings, setPaySettings] = useState(DEFAULT_PAY_SETTINGS);
   const amount = Number(raw);
+
+  useEffect(() => {
+    void getPaySettings().then(setPaySettings);
+  }, []);
 
   useEffect(() => {
     const u = getStoredUser();
@@ -70,11 +74,13 @@ function WithdrawPage() {
       return;
     }
     setUser(u);
-    settleSubscription(u.identifier);
-    setBalance(getBalance(u.identifier));
-    const s = getSubscription(u.identifier);
-    // الضريبة تُطلب فقط بعد اكتمال الباقة وقبل دفع ضريبتها
-    setSub(s && progressOf(s, Date.now()) >= 1 ? s : null);
+    void (async () => {
+      await settleSubscription(u.identifier).catch(() => null);
+      setBalance(await getBalance(u.identifier).catch(() => 0));
+      const s = await getSubscription(u.identifier).catch(() => null);
+      // الضريبة تُطلب فقط بعد اكتمال الباقة وقبل دفع ضريبتها
+      setSub(s && progressOf(s, Date.now()) >= 1 ? s : null);
+    })();
   }, [navigate]);
 
   if (!user) return null;
@@ -86,9 +92,17 @@ function WithdrawPage() {
     if (!/^\d{11}$/.test(senderNumber.trim())) return setError("اكتب الرقم الذي تم التحويل منه (11 رقم).");
     if (!proofName) return setError("أضف صورة التحويل.");
     setError(null);
-    submitTaxProof({ identifier: user!.identifier, senderNumber: senderNumber.trim(), proofName });
-    setSub(getSubscription(user!.identifier));
-    setDone("تم إرسال إثبات دفع الضريبة، سيتم مراجعته وتحويل الأرباح.");
+    setLoading(true);
+    void (async () => {
+      try {
+        await submitTaxProof({ identifier: user!.identifier, senderNumber: senderNumber.trim(), proofName });
+        setSub(await getSubscription(user!.identifier).catch(() => null));
+        setDone("تم إرسال إثبات دفع الضريبة، سيتم مراجعته وتحويل الأرباح.");
+      } catch {
+        setError("حدث خطأ أثناء الإرسال، حاول مرة أخرى.");
+      }
+      setLoading(false);
+    })();
   }
 
   function submitWithdraw() {
@@ -99,11 +113,17 @@ function WithdrawPage() {
     setLoading(true);
     const ms = randomLoadingMs();
     window.setTimeout(() => {
-      addRequest({ identifier: user!.identifier, name: user!.name, kind: "withdraw", amount });
-      setDone(
-        `تم إرسال طلب سحب ${fmt(amount)} ج.م عن طريق ${method} على الرقم ${receiveNumber.trim()}، سيتم تنفيذه بعد مراجعة الإدارة.`,
-      );
-      setLoading(false);
+      void (async () => {
+        try {
+          await addRequest({ identifier: user!.identifier, name: user!.name, kind: "withdraw", amount });
+          setDone(
+            `تم إرسال طلب سحب ${fmt(amount)} ج.م عن طريق ${method} على الرقم ${receiveNumber.trim()}، سيتم تنفيذه بعد مراجعة الإدارة.`,
+          );
+        } catch {
+          setError("حدث خطأ أثناء إرسال الطلب، حاول مرة أخرى.");
+        }
+        setLoading(false);
+      })();
     }, ms);
   }
 

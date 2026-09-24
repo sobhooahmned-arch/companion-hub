@@ -152,8 +152,8 @@ function LoginPanel({ onDone }: { onDone: (user: StoredUser) => void }) {
     }
   }, []);
 
-  function login(v: string) {
-    const account = findAccount(v);
+  async function login(v: string) {
+    const account = await findAccount(v).catch(() => null);
     if (!account) return setError("لا يوجد حساب بهذا البيان. أنشئ حسابًا أولاً.");
     if (account.password !== password)
       return setError("كلمة المرور غير صحيحة لهذا الحساب.");
@@ -172,7 +172,7 @@ function LoginPanel({ onDone }: { onDone: (user: StoredUser) => void }) {
     );
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const v = value.trim();
 
@@ -184,18 +184,28 @@ function LoginPanel({ onDone }: { onDone: (user: StoredUser) => void }) {
       return setError("رقم الموبايل لازم يكون 11 رقم.");
     if (password.length < 4) return setError("كلمة المرور 4 أحرف على الأقل.");
 
-    if (mode === "signup") {
-      if (findAccount(v))
-        return setError("يوجد حساب بهذا البيان بالفعل. سجّل دخولك بدلًا من ذلك.");
-      createAccount({ identifier: v, method, name: name.trim(), password });
-      setError(null);
-      setInfo(null);
-      login(v);
-      return;
-    }
+    setBusy(true);
+    try {
+      if (mode === "signup") {
+        if (await findAccount(v).catch(() => null)) {
+          setBusy(false);
+          return setError("يوجد حساب بهذا البيان بالفعل. سجّل دخولك بدلًا من ذلك.");
+        }
+        await createAccount({ identifier: v, method, name: name.trim(), password });
+        setError(null);
+        setInfo(null);
+        setBusy(false);
+        await login(v);
+        return;
+      }
 
-    setInfo(null);
-    login(v);
+      setInfo(null);
+      setBusy(false);
+      await login(v);
+    } catch {
+      setBusy(false);
+      setError("حدث خطأ في الاتصال، حاول مرة أخرى.");
+    }
   }
 
 
