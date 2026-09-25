@@ -1,3 +1,4 @@
+import { BanGuard } from "@/components/BanGuard";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
