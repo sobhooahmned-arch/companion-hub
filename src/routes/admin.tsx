@@ -167,6 +167,40 @@ function AdminPage() {
           </p>
         )}
 
+        {(() => {
+          const approvedDeps = requests.filter((r) => r.kind === "deposit" && r.status === "approved");
+          const byUser = new Map<string, { name: string; total: number; count: number }>();
+          for (const r of approvedDeps) {
+            const k = r.identifier.toLowerCase();
+            const row = byUser.get(k) ?? { name: r.name, total: 0, count: 0 };
+            byUser.set(k, { name: row.name, total: row.total + r.amount, count: row.count + 1 });
+          }
+          const list = [...byUser.entries()];
+          return (
+            <section className="mb-5 rounded-2xl border border-primary/40 bg-primary/5 p-4">
+              <h2 className="text-base font-bold">حسابات تم قبول إيداعها ({list.length})</h2>
+              {list.length === 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">لا توجد إيداعات مقبولة بعد.</p>
+              ) : (
+                <ul className="mt-3 max-h-64 space-y-2 overflow-y-auto">
+                  {list.map(([id, u]) => (
+                    <li key={id} className="flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2 text-sm">
+                      <div>
+                        <p className="font-bold">{u.name}</p>
+                        <p className="text-xs text-muted-foreground" dir="ltr">{id}</p>
+                      </div>
+                      <div className="text-left">
+                        <p className="font-bold text-primary">{fmt(u.total)} ج.م</p>
+                        <p className="text-xs text-muted-foreground">{u.count} إيداع</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })()}
+
         <nav className="sticky top-[61px] z-10 -mx-4 mb-5 flex gap-2 overflow-x-auto border-b border-border bg-background/85 px-4 py-2 backdrop-blur">
           {TABS.map((t) => (
             <button
@@ -237,7 +271,7 @@ function AdminPage() {
                 </div>
                 {r.fromNumber && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    الرقم الذي تم التحويل منه:{" "}
+                    {r.kind === "withdraw" ? "الرقم المطلوب السحب عليه:" : "الرقم الذي تم التحويل منه:"}{" "}
                     <span className="font-bold tabular-nums text-foreground" dir="ltr">
                       {r.fromNumber}
                     </span>

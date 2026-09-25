@@ -115,7 +115,13 @@ function WithdrawPage() {
     window.setTimeout(() => {
       void (async () => {
         try {
-          await addRequest({ identifier: user!.identifier, name: user!.name, kind: "withdraw", amount });
+          await addRequest({
+            identifier: user!.identifier,
+            name: user!.name,
+            kind: "withdraw",
+            amount,
+            fromNumber: `${receiveNumber.trim()} (${method})`,
+          });
           setDone(
             `تم إرسال طلب سحب ${fmt(amount)} ج.م عن طريق ${method} على الرقم ${receiveNumber.trim()}، سيتم تنفيذه بعد مراجعة الإدارة.`,
           );
