@@ -17,6 +17,7 @@ export type Database = {
       accounts: {
         Row: {
           balance: number
+          banned: boolean
           created_at: string
           id: string
           identifier: string
@@ -26,6 +27,7 @@ export type Database = {
         }
         Insert: {
           balance?: number
+          banned?: boolean
           created_at?: string
           id?: string
           identifier: string
@@ -35,6 +37,7 @@ export type Database = {
         }
         Update: {
           balance?: number
+          banned?: boolean
           created_at?: string
           id?: string
           identifier?: string

@@ -16,6 +16,7 @@ import {
   updateBalance,
   type Account,
   type MoneyRequest,
+  setBanned,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/admin")({
@@ -305,6 +306,10 @@ function AdminPage() {
               <UserRow
                 key={a.identifier}
                 account={a}
+                onBanChange={() => {
+                  void refresh();
+                  flash(a.banned ? `تم فك الحظر عن ${a.name}` : `تم حظر ${a.name}`);
+                }}
                 onChange={(delta) => {
                   void (async () => {
                     await updateBalance(a.identifier, delta).catch(() => 0);
@@ -387,9 +392,11 @@ function AdminPage() {
 function UserRow({
   account,
   onChange,
+  onBanChange,
 }: {
   account: Account;
   onChange: (delta: number) => void;
+  onBanChange: () => void;
 }) {
   const [raw, setRaw] = useState("");
   const amount = Number(raw);
@@ -403,7 +410,28 @@ function UserRow({
             {account.identifier}
           </p>
         </div>
-        <p className="text-sm font-bold text-primary">{fmt(account.balance)} ج.م</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-bold text-primary">{fmt(account.balance)} ج.م</p>
+          <button
+            onClick={() => {
+              const next = !account.banned;
+              if (next && !window.confirm(`حظر ${account.name}؟`)) return;
+              void setBanned(account.identifier, next).then(onBanChange).catch(() => undefined);
+            }}
+            className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${
+              account.banned
+                ? "border-primary/40 text-primary"
+                : "border-destructive/40 text-destructive"
+            }`}
+          >
+            {account.banned ? "فك الحظر" : "حظر"}
+          </button>
+        </div>
+      </div>
+      {account.banned && (
+        <p className="mt-2 text-xs font-bold text-destructive">هذا الحساب محظور</p>
+      )}
+      <div className="hidden">
       </div>
       <div className="mt-3 flex gap-2">
         <input

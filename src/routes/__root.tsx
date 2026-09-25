@@ -1,3 +1,4 @@
+import { BanGuard } from "@/components/BanGuard";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -132,6 +133,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <BanGuard />
     </QueryClientProvider>
   );
 }

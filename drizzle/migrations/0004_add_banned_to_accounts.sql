@@ -1,0 +1,1 @@
+ALTER TABLE public.accounts ADD COLUMN IF NOT EXISTS banned boolean NOT NULL DEFAULT false;
