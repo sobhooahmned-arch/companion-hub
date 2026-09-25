@@ -16,6 +16,7 @@ import {
   updateBalance,
   type Account,
   type MoneyRequest,
+  setBanned,
 } from "@/lib/store";
 
 export const Route = createFileRoute("/admin")({
