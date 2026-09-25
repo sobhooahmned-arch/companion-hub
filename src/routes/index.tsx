@@ -155,6 +155,7 @@ function LoginPanel({ onDone }: { onDone: (user: StoredUser) => void }) {
   async function login(v: string) {
     const account = await findAccount(v).catch(() => null);
     if (!account) return setError("لا يوجد حساب بهذا البيان. أنشئ حسابًا أولاً.");
+    if (account.banned) return setError("تم حظر هذا الحساب من المنصة.");
     if (account.password !== password)
       return setError("كلمة المرور غير صحيحة لهذا الحساب.");
     setError(null);

@@ -9,6 +9,7 @@ export type Account = {
   password: string;
   balance: number;
   createdAt: string;
+  banned?: boolean;
 };
 
 export type MoneyRequest = {
@@ -36,6 +37,7 @@ type AccountRow = {
   password: string;
   balance: number;
   created_at: string;
+  banned?: boolean | null;
 };
 
 type RequestRow = {
@@ -60,6 +62,7 @@ function mapAccount(r: AccountRow): Account {
     password: r.password,
     balance: r.balance,
     createdAt: r.created_at,
+    banned: !!r.banned,
   };
 }
 
@@ -83,7 +86,7 @@ function mapRequest(r: RequestRow): MoneyRequest {
 export async function getAccounts(): Promise<Account[]> {
   const { data, error } = await supabase
     .from("accounts")
-    .select("identifier, method, name, password, balance, created_at")
+    .select("identifier, method, name, password, balance, created_at, banned")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []).map(mapAccount);
@@ -92,7 +95,7 @@ export async function getAccounts(): Promise<Account[]> {
 export async function findAccount(identifier: string): Promise<Account | null> {
   const { data, error } = await supabase
     .from("accounts")
-    .select("identifier, method, name, password, balance, created_at")
+    .select("identifier, method, name, password, balance, created_at, banned")
     .ilike("identifier", identifier.trim())
     .limit(1);
   if (error) throw error;
@@ -115,7 +118,7 @@ export async function createAccount(input: {
       password: input.password,
       balance: 0,
     })
-    .select("identifier, method, name, password, balance, created_at")
+    .select("identifier, method, name, password, balance, created_at, banned")
     .single();
   if (error) throw error;
   return mapAccount(data);
@@ -214,4 +217,12 @@ export async function depositBanUntil(identifier: string): Promise<number | null
   if (!lastRejected?.decidedAt) return null;
   const until = new Date(lastRejected.decidedAt).getTime() + DEPOSIT_BAN_MS;
   return until > Date.now() ? until : null;
+}
+
+export async function setBanned(identifier: string, banned: boolean) {
+  const { error } = await supabase
+    .from("accounts")
+    .update({ banned })
+    .ilike("identifier", identifier.trim());
+  if (error) throw error;
 }
